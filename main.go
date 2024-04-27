@@ -23,7 +23,7 @@ func main() {
 	}))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Go Gym API Second build!"))
+		w.Write([]byte("Go Gym API Third build!"))
 	})
 
 	log.Println("Go Gym Server is running on port 8080...")
