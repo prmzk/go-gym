@@ -25,4 +25,13 @@ jobs:
           gcloud auth configure-docker asia-southeast2-docker.pkg.dev
           docker build -t asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest .
           docker push asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest
-          gcloud run deploy go-gym-api --image asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest --region asia-southeast2 --platform managed --allow-unauthenticated
+
+      - name: Deploy to cloud run
+        env:
+          GOOGLE_PROJECT: ${{ secrets.GOOGLE_PROJECT }}
+        run: |
+          gcloud run deploy go-gym-api \
+            --image=asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest \
+            --platform=managed \
+            --region=asia-southeast2 \
+            --allow-unauthenticated
