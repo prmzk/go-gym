@@ -14,9 +14,9 @@ COPY go.mod go.sum ./
 
 RUN go mod download
 
-RUN go mod vendor
-
 COPY . .
+
+RUN go mod vendor
 
 RUN go build -o gogym .
 
