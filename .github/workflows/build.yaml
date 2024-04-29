@@ -22,9 +22,10 @@ jobs:
         env:
           GOOGLE_PROJECT: ${{ secrets.GOOGLE_PROJECT }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }} # make sure to set this secret in your GitHub repository
+          SECRET_KEY: ${{ secrets.SECRET_KEY }} # make sure to set this secret in your GitHub repository
         run: |
           gcloud auth configure-docker asia-southeast2-docker.pkg.dev
-          docker build --build-arg DATABASE_URL=$DATABASE_URL -t asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest .
+          docker build --build-arg DATABASE_URL=$DATABASE_URL SECRET_KEY=$SECRET_KEY -t asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest .
           docker push asia-southeast2-docker.pkg.dev/$GOOGLE_PROJECT/go-gym/api:latest
 
       - name: Deploy to cloud run
