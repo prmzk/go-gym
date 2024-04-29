@@ -3,35 +3,34 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
+	"github.com/prmzk/go-base-prmzk/api"
+	"github.com/prmzk/go-base-prmzk/database"
 )
 
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	if os.Getenv("APP_ENV") == "development" {
+		godotenv.Load()
+	}
 
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	s, err := database.NewStorage(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Go Gym API Third build!"))
-	})
+	r, err := api.NewRouter(s)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Println("Go Gym Server is running on port 8080...")
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
 	}
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 
 	if err != nil {
 		log.Fatal(err)
