@@ -7,61 +7,117 @@ package database
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
 
-const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, name) 
-VALUES ($1, $2) 
-RETURNING id, name, created_at, updated_at
+const clearUserToken = `-- name: ClearUserToken :one
+UPDATE users SET jwt_id = NULL, token_expiration = NULL WHERE id = $1
+RETURNING id, name, email, created_at, updated_at, jwt_id, token_expiration
 `
 
-type CreateUserParams struct {
-	ID   uuid.UUID
-	Name string
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Name)
+func (q *Queries) ClearUserToken(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, clearUserToken, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
+		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.JwtID,
+		&i.TokenExpiration,
 	)
 	return i, err
 }
 
-const getUsers = `-- name: GetUsers :many
-SELECT id, name, created_at, updated_at FROM users
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (id, email) 
+VALUES ($1, $2) 
+RETURNING id, name, email, created_at, updated_at, jwt_id, token_expiration
 `
 
-func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getUsers)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []User
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type CreateUserParams struct {
+	ID    uuid.UUID
+	Email string
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.JwtID,
+		&i.TokenExpiration,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, name, email, created_at, updated_at, jwt_id, token_expiration FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.JwtID,
+		&i.TokenExpiration,
+	)
+	return i, err
+}
+
+const getUserById = `-- name: GetUserById :one
+SELECT id, name, email, created_at, updated_at, jwt_id, token_expiration FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserById, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.JwtID,
+		&i.TokenExpiration,
+	)
+	return i, err
+}
+
+const setUserToken = `-- name: SetUserToken :one
+UPDATE users SET jwt_id = $2, token_expiration = $3 WHERE id = $1
+RETURNING id, name, email, created_at, updated_at, jwt_id, token_expiration
+`
+
+type SetUserTokenParams struct {
+	ID              uuid.UUID
+	JwtID           sql.NullString
+	TokenExpiration sql.NullTime
+}
+
+func (q *Queries) SetUserToken(ctx context.Context, arg SetUserTokenParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, setUserToken, arg.ID, arg.JwtID, arg.TokenExpiration)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.JwtID,
+		&i.TokenExpiration,
+	)
+	return i, err
 }

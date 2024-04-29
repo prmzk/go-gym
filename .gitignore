@@ -1,2 +1,5 @@
 .env
 /env/
+
+/vendor/*
+!vendor/modules.txt
