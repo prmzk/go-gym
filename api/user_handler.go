@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/render"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/prmzk/go-base-prmzk/database"
-	respond "github.com/prmzk/go-base-prmzk/json"
 )
 
 type User struct {
@@ -34,108 +33,77 @@ func databaseUserToUser(user database.User) User {
 	}
 }
 
-func isValidEmail(email string) bool {
+func isValidEmail(email string) error {
 	// Regular expression pattern for email validation
 	// You can modify this pattern according to your requirements
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	match, _ := regexp.MatchString(pattern, email)
-	return match
+	if !match {
+		return ErrInvalidEmail
+	}
+	return nil
+}
+
+type authRequest struct {
+	Email string
+}
+
+func (body *authRequest) Bind(r *http.Request) error {
+	body.Email = strings.TrimSpace(body.Email)
+	body.Email = strings.ToLower(body.Email)
+
+	return isValidEmail(body.Email)
 }
 
 func (apiCfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Email string `json:"email"`
-	}
+	body := &authRequest{}
 
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
-
-	params := parameters{}
-	err := decoder.Decode(&params)
-
-	if err != nil {
-		respond.RespondWithError(w, 400, "Invalid request payload")
-		return
-	}
-
-	if params.Email == "" {
-		respond.RespondWithError(w, 400, "Email cannot be empty")
-		return
-	}
-
-	// Tidy up the email string
-	params.Email = strings.TrimSpace(params.Email)
-	params.Email = strings.ToLower(params.Email)
-
-	// Validate email format
-	if !isValidEmail(params.Email) {
-		respond.RespondWithError(w, 400, "Invalid email format")
+	if err := render.Bind(r, body); err != nil {
+		render.Render(w, r, ErrBadRequest(ErrInvalidEmail))
 		return
 	}
 
 	// Check if email already exists
-	_, err = apiCfg.DB.GetUserByEmail(r.Context(), params.Email)
+	_, err := apiCfg.DB.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			respond.RespondWithError(w, 500, err.Error())
+			render.Render(w, r, ErrInternalServerError)
 			return
 		}
 	} else {
-		respond.RespondWithError(w, 400, fmt.Sprintf("Email %s already exists", params.Email))
+		render.Render(w, r, ErrBadRequest(ErrDuplicateEmail))
 		return
 	}
 
-	user, err := apiCfg.DB.CreateUser(r.Context(), database.CreateUserParams{
+	_, err = apiCfg.DB.CreateUser(r.Context(), database.CreateUserParams{
 		ID:    uuid.New(),
-		Email: params.Email,
+		Email: body.Email,
 	})
 
 	if err != nil {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
-	respond.RespondWithJSON(w, 200, databaseUserToUser(user))
+	render.Status(r, http.StatusCreated)
+	render.Respond(w, r, http.NoBody)
 }
 
 func (apiCfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Email string `json:"email"`
-	}
+	body := &authRequest{}
 
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
-
-	params := parameters{}
-	err := decoder.Decode(&params)
-
-	if err != nil {
-		respond.RespondWithError(w, 400, "Invalid request payload")
+	if err := render.Bind(r, body); err != nil {
+		render.Render(w, r, ErrBadRequest(ErrInvalidEmail))
 		return
 	}
 
-	if params.Email == "" {
-		respond.RespondWithError(w, 400, "Email cannot be empty")
-		return
-	}
-
-	// Tidy up the email string
-	params.Email = strings.TrimSpace(params.Email)
-	params.Email = strings.ToLower(params.Email)
-
-	// Validate email format
-	if !isValidEmail(params.Email) {
-		respond.RespondWithError(w, 400, "Invalid email format")
-		return
-	}
-
-	user, err := apiCfg.DB.GetUserByEmail(r.Context(), params.Email)
+	user, err := apiCfg.DB.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respond.RespondWithError(w, 404, "User not found")
+			render.Render(w, r, ErrBadRequest(ErrInvalidEmail))
 			return
 		}
-		respond.RespondWithError(w, 500, err.Error())
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
@@ -148,7 +116,7 @@ func (apiCfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request
 	updatedUser, err := apiCfg.DB.SetUserToken(r.Context(), *tokenClaims)
 
 	if err != nil {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
@@ -160,119 +128,98 @@ func (apiCfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request
 	tokenString, err := token.SignedString([]byte(os.Getenv("SECRET_KEY")))
 
 	if err != nil {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+
 		return
 	}
 
 	fmt.Println("sent to:", updatedUser.Email)
 	fmt.Printf("http://localhost:8080/v1/users/login/callback?token=%s\n", tokenString)
-	respond.RespondWithJSON(w, 200, map[string]string{"message": "Email sent"})
+
+	render.Status(r, http.StatusCreated)
+	render.Respond(w, r, map[string]string{"message": "Email sent"})
 }
 
 func (apiCfg *apiConfig) handlerValidateToken(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		respond.RespondWithError(w, 400, "Token not found in query string")
+		render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
 		return
 	}
 
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		// Verify the signing method
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("invalid signing method")
 		}
-		// Return the secret key used for signing the token
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
 
 	if err != nil {
-		respond.RespondWithError(w, 401, "Invalid token")
+		render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
 		return
 	}
 	fmt.Println(claims)
 
-	// Get the user ID from the token claims
-	userID, ok := claims["id"].(string)
-	if !ok {
-		respond.RespondWithError(w, 401, "Invalid token")
-		return
-	}
-
-	expiration, ok := claims["token_expiration"].(float64)
-	if !ok {
-		respond.RespondWithError(w, 401, "Invalid token")
-		return
-	}
-
-	jwtID, ok := claims["jwt_id"].(string)
-	if !ok {
-		respond.RespondWithError(w, 401, "Invalid token")
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
+	userUUID, err := uuid.Parse(claims["id"].(string))
 	if err != nil {
-		respond.RespondWithError(w, 400, "Invalid user ID")
+		render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
 		return
 	}
 
 	user, err := apiCfg.DB.GetUserById(r.Context(), userUUID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			respond.RespondWithError(w, 404, "User not found")
+			render.Render(w, r, ErrInternalServerError)
 			return
 		}
-		respond.RespondWithError(w, 500, err.Error())
+		render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
 		return
 	}
 
-	if user.JwtID.String != jwtID {
-		respond.RespondWithError(w, 401, "Invalid token")
+	if user.JwtID.String != claims["jwt_id"].(string) {
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
-	if user.TokenExpiration.Time.Unix() != int64(expiration) {
-		respond.RespondWithError(w, 401, "Invalid token")
+	if user.TokenExpiration.Time.Unix() != int64(claims["token_expiration"].(float64)) {
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
 	if user.TokenExpiration.Time.Before(time.Now().UTC()) {
-		respond.RespondWithError(w, 401, "Token expired. Please login again.")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
 	clearedUser, err := apiCfg.DB.ClearUserToken(r.Context(), user.ID)
 	if err != nil {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
-	authToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	authToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": clearedUser.ID,
-	})
-	authTokenString, err := authToken.SignedString([]byte(os.Getenv("SECRET_KEY")))
-
+	}).SignedString([]byte(os.Getenv("SECRET_KEY")))
 	if err != nil {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
-	respond.RespondWithJSON(w, 200, struct {
+	render.Respond(w, r, struct {
 		Token string `json:"token"`
 	}{
-		Token: authTokenString,
+		Token: authToken,
 	})
 }
 
 func (apiCfg *apiConfig) handlerMe(w http.ResponseWriter, r *http.Request) {
 	user, ok := r.Context().Value(userKey).(database.User)
-	fmt.Println(user)
 
 	if !ok {
-		respond.RespondWithError(w, 500, "Internal server error")
+		render.Render(w, r, ErrInternalServerError)
 		return
 	}
 
-	respond.RespondWithJSON(w, 200, databaseUserToUser(user))
+	render.Respond(w, r, databaseUserToUser(user))
 }
