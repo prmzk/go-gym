@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/render"
@@ -13,12 +12,6 @@ type ErrResponse struct {
 	StatusText     string `json:"status"`
 	ErrorText      string `json:"error,omitempty"`
 }
-
-var (
-	ErrInvalidEmail       = errors.New("invalid email address")
-	ErrDuplicateEmail     = errors.New("email alredy registered")
-	ErrInvalidBearerToken = errors.New("invalid bearer token")
-)
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
