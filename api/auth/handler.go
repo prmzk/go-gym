@@ -82,7 +82,7 @@ func (authApi *authApi) handlerLoginUser(w http.ResponseWriter, r *http.Request)
 	user, err := authApi.DB.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			render.Render(w, r, response.ErrorResponseBadRequest(ErrInvalidEmail))
+			render.Render(w, r, response.ErrorResponseBadRequest(ErrEmailNotFound))
 			return
 		}
 		render.Render(w, r, response.ErrorResponseInternalServerError())
@@ -109,14 +109,13 @@ func (authApi *authApi) handlerLoginUser(w http.ResponseWriter, r *http.Request)
 	})
 	tokenString, err := token.SignedString([]byte(os.Getenv("SECRET_KEY")))
 	if err != nil {
-		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
-
+		render.Render(w, r, response.ErrorResponseInternalServerError())
 		return
 	}
 
 	// Simulate sending email
 	fmt.Println("sent to:", user.Email)
-	fmt.Printf("http://localhost:8080/v1/users/login/callback?token=%s\n", tokenString)
+	fmt.Printf("http://localhost:3000?token=%s\n", tokenString)
 
 	// Return success
 	render.Render(w, r, response.SuccessResponseOK(nil))
