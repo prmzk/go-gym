@@ -74,14 +74,21 @@ type TemplateExercise struct {
 	UpdatedAt  time.Time
 }
 
+type Token struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	UserID     uuid.NullUUID
+	Expiration time.Time
+	Type       string
+}
+
 type User struct {
-	ID              uuid.UUID
-	Name            sql.NullString
-	Email           string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	JwtID           sql.NullString
-	TokenExpiration sql.NullTime
+	ID        uuid.UUID
+	Name      sql.NullString
+	Email     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Workout struct {
