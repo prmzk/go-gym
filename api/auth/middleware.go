@@ -1,4 +1,4 @@
-package api
+package auth
 
 import (
 	"context"
@@ -11,23 +11,26 @@ import (
 	"github.com/go-chi/render"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/prmzk/go-base-prmzk/api/response"
 )
 
 type contextKey string
 
-const userKey contextKey = "user"
+const UserKey contextKey = "user"
+const JwtSub = "sub"
 
-func (apiCfg *apiConfig) AuthMiddleware(next http.Handler) http.Handler {
+func (authApi *authApi) VerifyToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
+
 		if authHeader == "" {
-			render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
 		}
 
 		authParts := strings.Split(authHeader, " ")
 		if len(authParts) != 2 || authParts[0] != "Bearer" {
-			render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
 		}
 
@@ -42,34 +45,34 @@ func (apiCfg *apiConfig) AuthMiddleware(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
-			render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
 		}
 
 		// Get the user ID from the token claims
-		userID, ok := claims["sub"].(string)
+		userID, ok := claims[JwtSub].(string)
 		if !ok {
-			render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
 		}
 
 		userUUID, err := uuid.Parse(userID)
 		if err != nil {
-			render.Render(w, r, ErrInternalServerError)
+			render.Render(w, r, response.ErrorResponseInternalServerError())
 			return
 		}
 
-		user, err := apiCfg.DB.GetUserById(r.Context(), userUUID)
+		user, err := authApi.DB.GetUserById(r.Context(), userUUID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				render.Render(w, r, ErrUnauthorized(ErrInvalidBearerToken))
+				render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 				return
 			}
-			render.Render(w, r, ErrInternalServerError)
+			render.Render(w, r, response.ErrorResponseInternalServerError())
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userKey, user)
+		ctx := context.WithValue(r.Context(), UserKey, user)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

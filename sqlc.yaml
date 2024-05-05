@@ -1,8 +1,20 @@
 version: "2"
 sql:
-  - schema: "database/schema"
-    queries: "database/queries"
+  - name: "auth"
+    schema: "database/schema"
+    queries:
+      - "database/queries/users.sql"
     engine: "postgresql"
     gen:
       go:
-        out: "database"
+        out: "database/store/auth"
+
+  - name: "data"
+    schema: "database/schema"
+    queries:
+      - "database/queries/workouts.sql"
+      - "database/queries/exercises.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        out: "database/store/data"

@@ -3,3 +3,7 @@
 
 /vendor/*
 !vendor/modules.txt
+
+.todo
+
+*.csv

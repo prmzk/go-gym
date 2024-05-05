@@ -7,7 +7,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/prmzk/go-base-prmzk/api"
-	"github.com/prmzk/go-base-prmzk/database"
 )
 
 func main() {
@@ -15,12 +14,7 @@ func main() {
 		godotenv.Load()
 	}
 
-	s, err := database.NewStorage(os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	r, err := api.NewRouter(s)
+	r, err := api.NewRouter(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
