@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -25,22 +26,27 @@ func isValidEmail(email string) error {
 	return nil
 }
 
-type authRequest struct {
+type registerRequest struct {
 	Email string
+	Name  string
 }
 
-func (body *authRequest) Bind(r *http.Request) error {
+func (body *registerRequest) Bind(r *http.Request) error {
 	body.Email = strings.TrimSpace(body.Email)
 	body.Email = strings.ToLower(body.Email)
+
+	if body.Name == "" {
+		return errors.New("name is required")
+	}
 
 	return isValidEmail(body.Email)
 }
 
 func (authApi *authApi) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	// Get Email from body
-	body := &authRequest{}
+	body := &registerRequest{}
 	if err := render.Bind(r, body); err != nil {
-		render.Render(w, r, response.ErrorResponseBadRequest(ErrInvalidEmail))
+		render.Render(w, r, response.ErrorResponseBadRequest(ErrInvalidEmailOrName))
 		return
 	}
 
@@ -60,6 +66,7 @@ func (authApi *authApi) handlerCreateUser(w http.ResponseWriter, r *http.Request
 	_, err = authApi.DB.CreateUser(r.Context(), authStore.CreateUserParams{
 		ID:    uuid.New(),
 		Email: body.Email,
+		Name:  sql.NullString{String: body.Name, Valid: true},
 	})
 	if err != nil {
 		render.Render(w, r, response.ErrorResponseInternalServerError())
@@ -70,9 +77,20 @@ func (authApi *authApi) handlerCreateUser(w http.ResponseWriter, r *http.Request
 	render.Render(w, r, response.SuccessResponseCreated(nil))
 }
 
+type loginRequest struct {
+	Email string
+}
+
+func (body *loginRequest) Bind(r *http.Request) error {
+	body.Email = strings.TrimSpace(body.Email)
+	body.Email = strings.ToLower(body.Email)
+
+	return isValidEmail(body.Email)
+}
+
 func (authApi *authApi) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	// Get Email from body
-	body := &authRequest{}
+	body := &loginRequest{}
 	if err := render.Bind(r, body); err != nil {
 		render.Render(w, r, response.ErrorResponseBadRequest(ErrInvalidEmail))
 		return
@@ -115,7 +133,7 @@ func (authApi *authApi) handlerLoginUser(w http.ResponseWriter, r *http.Request)
 
 	// Simulate sending email
 	fmt.Println("sent to:", user.Email)
-	fmt.Printf("http://localhost:3000?token=%s\n", tokenString)
+	fmt.Printf("http://localhost:3000/login?token=%s\n", tokenString)
 
 	// Return success
 	render.Render(w, r, response.SuccessResponseOK(nil))
@@ -332,6 +350,21 @@ func (authApi *authApi) handlerRefreshToken(w http.ResponseWriter, r *http.Reque
 	}
 
 	render.Render(w, r, response.SuccessResponseOK(map[string]string{"accessToken": accessToken, "refreshToken": refreshToken}))
+}
+
+func (authApi *authApi) handlerLogout(w http.ResponseWriter, r *http.Request) {
+	user, ok := r.Context().Value(UserKey).(authStore.User)
+	if !ok {
+		render.Render(w, r, response.ErrorResponseInternalServerError())
+		return
+	}
+
+	_, err := authApi.DB.ClearAllTokenUser(r.Context(), uuid.NullUUID{UUID: user.ID, Valid: true})
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseInternalServerError())
+		return
+	}
+	render.Render(w, r, response.SuccessResponseOK(nil))
 }
 
 func (authApi *authApi) handlerMe(w http.ResponseWriter, r *http.Request) {

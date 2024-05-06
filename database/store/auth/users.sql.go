@@ -74,18 +74,19 @@ func (q *Queries) ClearUserToken(ctx context.Context, arg ClearUserTokenParams) 
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, email) 
-VALUES ($1, $2) 
+INSERT INTO users (id, email, name) 
+VALUES ($1, $2, $3) 
 RETURNING id, name, email, created_at, updated_at
 `
 
 type CreateUserParams struct {
 	ID    uuid.UUID
 	Email string
+	Name  sql.NullString
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Email)
+	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Email, arg.Name)
 	var i User
 	err := row.Scan(
 		&i.ID,

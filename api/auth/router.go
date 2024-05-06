@@ -30,6 +30,7 @@ func (authApi *authApi) Router() *chi.Mux {
 	r.Post("/login", authApi.handlerLoginUser)
 	r.Get("/login/callback", authApi.handlerValidateToken)
 	r.Get("/refresh", authApi.handlerRefreshToken)
+	r.With(authApi.VerifyToken).Post("/logout", authApi.handlerLogout)
 	r.With(authApi.VerifyToken).Get("/me", authApi.handlerMe)
 
 	return r
