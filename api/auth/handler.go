@@ -17,6 +17,12 @@ import (
 	authStore "github.com/prmzk/go-base-prmzk/database/store/auth"
 )
 
+var (
+	refreshTokenExp = time.Hour * 24 * 7
+	accessTokenExp  = time.Hour * 3
+	loginTokenExp   = time.Hour * 1
+)
+
 func isValidEmail(email string) error {
 	pattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	match, _ := regexp.MatchString(pattern, email)
@@ -111,8 +117,15 @@ func (authApi *authApi) handlerLoginUser(w http.ResponseWriter, r *http.Request)
 	tokenClaims := &authStore.SetUserTokenParams{
 		UserID:     uuid.NullUUID{UUID: user.ID, Valid: true},
 		Type:       "login",
-		Expiration: time.Now().Add(time.Hour * 1),
+		Expiration: time.Now().Add(loginTokenExp),
 	}
+
+	_, err = authApi.DB.ClearAllTokenUser(r.Context(), tokenClaims.UserID)
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseBadRequest(err))
+		return
+	}
+
 	tokenDB, err := authApi.DB.SetUserToken(r.Context(), *tokenClaims)
 	if err != nil {
 		render.Render(w, r, response.ErrorResponseInternalServerError())
@@ -149,16 +162,13 @@ func (authApi *authApi) handlerValidateToken(w http.ResponseWriter, r *http.Requ
 
 	// Parse token
 	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+	_, errClaim := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("invalid signing method")
 		}
+
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
-	if err != nil {
-		render.Render(w, r, response.ErrorResponseUnauthorized(err))
-		return
-	}
 
 	// Get user from token
 	tokenUUID, err := uuid.Parse(claims["jti"].(string))
@@ -180,23 +190,18 @@ func (authApi *authApi) handlerValidateToken(w http.ResponseWriter, r *http.Requ
 		render.Render(w, r, response.ErrorResponseInternalServerError())
 		return
 	}
-	tokenIsNotValid := tokenDB.Type != "login" || tokenDB.Expiration.Before(time.Now())
-	if tokenIsNotValid {
-		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
+
+	if errClaim != nil {
+		render.Render(w, r, response.ErrorResponseUnauthorized(err))
 		return
 	}
 
-	_, err = authApi.DB.ClearAllTokenUser(r.Context(), tokenDB.UserID)
-	if err != nil {
-		render.Render(w, r, response.ErrorResponseInternalServerError())
-		return
-	}
-
+	// Token valid
 	// Create token to be sent for future requests
 	tokenClaims := &authStore.SetUserTokenParams{
 		UserID:     tokenDB.UserID,
 		Type:       "access",
-		Expiration: time.Now().Add(time.Hour * 3),
+		Expiration: time.Now().Add(accessTokenExp),
 	}
 	tokenDB, err = authApi.DB.SetUserToken(r.Context(), *tokenClaims)
 	if err != nil {
@@ -220,7 +225,7 @@ func (authApi *authApi) handlerValidateToken(w http.ResponseWriter, r *http.Requ
 	tokenClaims = &authStore.SetUserTokenParams{
 		UserID:     tokenDB.UserID,
 		Type:       "refresh",
-		Expiration: time.Now().Add(time.Hour * 24 * 7),
+		Expiration: time.Now().Add(refreshTokenExp),
 	}
 	tokenDB, err = authApi.DB.SetUserToken(r.Context(), *tokenClaims)
 	if err != nil {
@@ -253,17 +258,12 @@ func (authApi *authApi) handlerRefreshToken(w http.ResponseWriter, r *http.Reque
 
 	// Parse token
 	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+	_, errClaims := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("invalid signing method")
 		}
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
-
-	if err != nil {
-		render.Render(w, r, response.ErrorResponseUnauthorized(err))
-		return
-	}
 
 	// Get user from token
 	tokenUUID, err := uuid.Parse(claims["jti"].(string))
@@ -286,26 +286,26 @@ func (authApi *authApi) handlerRefreshToken(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	tokenIsNotValid := tokenDB.Type != "refresh" || tokenDB.Expiration.Before(time.Now())
-	if tokenIsNotValid {
-		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
-		return
-	}
-
 	_, err = authApi.DB.ClearUserToken(r.Context(), authStore.ClearUserTokenParams{
 		UserID: tokenDB.UserID,
 		Type:   "access",
 	})
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		render.Render(w, r, response.ErrorResponseInternalServerError())
 		return
 	}
 
+	if errClaims != nil {
+		render.Render(w, r, response.ErrorResponseUnauthorized(err))
+		return
+	}
+
+	// Valid token
 	// Create token to be sent for future requests
 	tokenClaims := &authStore.SetUserTokenParams{
 		UserID:     tokenDB.UserID,
 		Type:       "access",
-		Expiration: time.Now().Add(time.Hour * 3),
+		Expiration: time.Now().Add(accessTokenExp),
 	}
 	tokenDB, err = authApi.DB.SetUserToken(r.Context(), *tokenClaims)
 	if err != nil {
@@ -329,7 +329,7 @@ func (authApi *authApi) handlerRefreshToken(w http.ResponseWriter, r *http.Reque
 	tokenClaims = &authStore.SetUserTokenParams{
 		UserID:     tokenDB.UserID,
 		Type:       "refresh",
-		Expiration: time.Now().Add(time.Hour * 24 * 7),
+		Expiration: time.Now().Add(refreshTokenExp),
 	}
 	tokenDB, err = authApi.DB.SetUserToken(r.Context(), *tokenClaims)
 	if err != nil {

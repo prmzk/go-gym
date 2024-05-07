@@ -59,7 +59,7 @@ func (authApi *authApi) VerifyToken(next http.Handler) http.Handler {
 		tokenDB, err := authApi.DB.GetUserToken(r.Context(), tokenUUID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
+				render.Render(w, r, response.ErrorResponseUnauthorized(ErrAccessTokenNotFound))
 				return
 			}
 			render.Render(w, r, response.ErrorResponseInternalServerError())
@@ -67,6 +67,15 @@ func (authApi *authApi) VerifyToken(next http.Handler) http.Handler {
 		}
 		tokenIsNotValid := tokenDB.Type != "access" || tokenDB.Expiration.Before(time.Now())
 		if tokenIsNotValid {
+			_, err := authApi.DB.ClearUserToken(r.Context(), authStore.ClearUserTokenParams{
+				TokenID: tokenUUID,
+				Type:    "access",
+			})
+			if err != nil {
+				render.Render(w, r, response.ErrorResponseInternalServerError())
+				return
+			}
+
 			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
 		}
