@@ -170,8 +170,14 @@ func (authApi *authApi) handlerValidateToken(w http.ResponseWriter, r *http.Requ
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
 
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
+		return
+	}
+
 	// Get user from token
-	tokenUUID, err := uuid.Parse(claims["jti"].(string))
+	tokenUUID, err := uuid.Parse(jti)
 	if err != nil {
 		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 		return
@@ -265,8 +271,14 @@ func (authApi *authApi) handlerRefreshToken(w http.ResponseWriter, r *http.Reque
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
 
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
+		return
+	}
+
 	// Get user from token
-	tokenUUID, err := uuid.Parse(claims["jti"].(string))
+	tokenUUID, err := uuid.Parse(jti)
 	if err != nil {
 		render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 		return

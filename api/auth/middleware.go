@@ -34,7 +34,6 @@ func (authApi *authApi) VerifyToken(next http.Handler) http.Handler {
 			return
 		}
 		token := authParts[1]
-
 		// Parse the token
 		claims := jwt.MapClaims{}
 		_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
@@ -48,8 +47,14 @@ func (authApi *authApi) VerifyToken(next http.Handler) http.Handler {
 			return
 		}
 
+		jti, ok := claims["jti"].(string)
+		if !ok {
+			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
+			return
+		}
+
 		// Get user from token
-		tokenUUID, err := uuid.Parse(claims["jti"].(string))
+		tokenUUID, err := uuid.Parse(jti)
 		if err != nil {
 			render.Render(w, r, response.ErrorResponseUnauthorized(ErrInvalidBearerToken))
 			return
