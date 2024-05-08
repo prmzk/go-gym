@@ -54,10 +54,10 @@ func (dataApi *dataApi) handlerGetExercise(w http.ResponseWriter, r *http.Reques
 	}
 
 	responseData := &struct {
-		Excercises []Exercise `json:"excercises"`
-	}{Excercises: []Exercise{}}
+		Exercises []Exercise `json:"exercises"`
+	}{Exercises: []Exercise{}}
 	for _, e := range exerciseRows {
-		responseData.Excercises = append(responseData.Excercises, Exercise{
+		responseData.Exercises = append(responseData.Exercises, Exercise{
 			ID:        e.ID,
 			Name:      e.Name,
 			CreatedAt: e.CreatedAt,
@@ -88,7 +88,7 @@ func (dataApi *dataApi) handlerGetExcerciseById(w http.ResponseWriter, r *http.R
 	}
 
 	render.Render(w, r, response.SuccessResponseOK(&struct {
-		Exercise Exercise `json:"excercise"`
+		Exercise Exercise `json:"exercise"`
 	}{Exercise: Exercise{
 		ID:        exercise.ID,
 		Name:      exercise.Name,
@@ -144,17 +144,17 @@ func (dataApi *dataApi) handlerGetExcerciseByCategory(w http.ResponseWriter, r *
 	}
 
 	responseData := &struct {
-		ID         uuid.UUID  `json:"id"`
-		Name       string     `json:"name"`
-		CreatedAt  time.Time  `json:"created_at"`
-		UpdatedAt  time.Time  `json:"updated_at"`
-		Excercises []Exercise `json:"excercises"`
+		ID        uuid.UUID  `json:"id"`
+		Name      string     `json:"name"`
+		CreatedAt time.Time  `json:"created_at"`
+		UpdatedAt time.Time  `json:"updated_at"`
+		Exercises []Exercise `json:"exercises"`
 	}{
-		ID:         exerciseRows[0].CategoryID,
-		Name:       exerciseRows[0].CategoryName,
-		CreatedAt:  exerciseRows[0].CategoryCreatedAt,
-		UpdatedAt:  exerciseRows[0].CategoryUpdatedAt,
-		Excercises: []Exercise{},
+		ID:        exerciseRows[0].CategoryID,
+		Name:      exerciseRows[0].CategoryName,
+		CreatedAt: exerciseRows[0].CategoryCreatedAt,
+		UpdatedAt: exerciseRows[0].CategoryUpdatedAt,
+		Exercises: []Exercise{},
 	}
 
 	if exerciseRows[0].ID.UUID == uuid.Nil {
@@ -163,7 +163,7 @@ func (dataApi *dataApi) handlerGetExcerciseByCategory(w http.ResponseWriter, r *
 	}
 
 	for _, e := range exerciseRows {
-		responseData.Excercises = append(responseData.Excercises, Exercise{
+		responseData.Exercises = append(responseData.Exercises, Exercise{
 			ID:        e.ID.UUID,
 			Name:      e.Name.String,
 			CreatedAt: e.CreatedAt.Time,
@@ -220,17 +220,17 @@ func (dataApi *dataApi) handlerGetExcerciseByBodyPart(w http.ResponseWriter, r *
 	}
 
 	responseData := &struct {
-		ID         uuid.UUID  `json:"id"`
-		Name       string     `json:"name"`
-		CreatedAt  time.Time  `json:"created_at"`
-		UpdatedAt  time.Time  `json:"updated_at"`
-		Excercises []Exercise `json:"excercises"`
+		ID        uuid.UUID  `json:"id"`
+		Name      string     `json:"name"`
+		CreatedAt time.Time  `json:"created_at"`
+		UpdatedAt time.Time  `json:"updated_at"`
+		Exercises []Exercise `json:"exercises"`
 	}{
-		ID:         exerciseRows[0].BodyPartID,
-		Name:       exerciseRows[0].BodyPartName,
-		CreatedAt:  exerciseRows[0].BodyPartCreatedAt,
-		UpdatedAt:  exerciseRows[0].BodyPartUpdatedAt,
-		Excercises: []Exercise{},
+		ID:        exerciseRows[0].BodyPartID,
+		Name:      exerciseRows[0].BodyPartName,
+		CreatedAt: exerciseRows[0].BodyPartCreatedAt,
+		UpdatedAt: exerciseRows[0].BodyPartUpdatedAt,
+		Exercises: []Exercise{},
 	}
 
 	if exerciseRows[0].ID.UUID == uuid.Nil {
@@ -239,7 +239,7 @@ func (dataApi *dataApi) handlerGetExcerciseByBodyPart(w http.ResponseWriter, r *
 	}
 
 	for _, e := range exerciseRows {
-		responseData.Excercises = append(responseData.Excercises, Exercise{
+		responseData.Exercises = append(responseData.Exercises, Exercise{
 			ID:        e.ID.UUID,
 			Name:      e.Name.String,
 			Category:  e.Category.String,

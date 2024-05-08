@@ -27,20 +27,20 @@ func NewApi(conn *sql.DB, authMiddleware func(http.Handler) http.Handler) (*data
 func (dataApi *dataApi) Router() *chi.Mux {
 	r := chi.NewRouter()
 
-	excercisesRouter := chi.NewRouter()
-	excercisesRouter.Use(dataApi.auth)
-	excercisesRouter.Get("/", dataApi.handlerGetExercise)
-	excercisesRouter.Get("/{id}", dataApi.handlerGetExcerciseById)
-	excercisesRouter.Get("/categories*", dataApi.handlerGetCategories)
-	excercisesRouter.Get("/categories/{id}", dataApi.handlerGetExcerciseByCategory)
-	excercisesRouter.Get("/bodyparts*", dataApi.handlerGetBodyParts)
-	excercisesRouter.Get("/bodyparts/{id}", dataApi.handlerGetExcerciseByBodyPart)
+	exerciseRouter := chi.NewRouter()
+	exerciseRouter.Use(dataApi.auth)
+	exerciseRouter.Get("/", dataApi.handlerGetExercise)
+	exerciseRouter.Get("/{id}", dataApi.handlerGetExcerciseById)
+	exerciseRouter.Get("/categories*", dataApi.handlerGetCategories)
+	exerciseRouter.Get("/categories/{id}", dataApi.handlerGetExcerciseByCategory)
+	exerciseRouter.Get("/bodyparts*", dataApi.handlerGetBodyParts)
+	exerciseRouter.Get("/bodyparts/{id}", dataApi.handlerGetExcerciseByBodyPart)
 
 	workoutsRouter := chi.NewRouter()
 	workoutsRouter.Use(dataApi.auth)
 	workoutsRouter.Get("/", dataApi.handlerGetWorkouts)
 
-	r.Mount("/excercises", excercisesRouter)
+	r.Mount("/exercises", exerciseRouter)
 	r.Mount("/workouts", workoutsRouter)
 
 	return r
