@@ -233,6 +233,7 @@ LEFT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part
 WHERE (exercises.name ILIKE '%' || $1 || '%' OR $1 IS NULL)
 AND (category.name = $2 OR $2 IS NULL)
 AND (body_part.name = $3 OR $3 IS NULL)
+ORDER BY exercises.name ASC
 `
 
 type GetExercisesParams struct {

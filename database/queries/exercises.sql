@@ -5,7 +5,8 @@ LEFT JOIN exercise_categories as category ON exercises.category_id = category.id
 LEFT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part.id
 WHERE (exercises.name ILIKE '%' || sqlc.narg('name') || '%' OR sqlc.narg('name') IS NULL)
 AND (category.name = sqlc.narg('category') OR sqlc.narg('category') IS NULL)
-AND (body_part.name = sqlc.narg('body_part') OR sqlc.narg('body_part') IS NULL);
+AND (body_part.name = sqlc.narg('body_part') OR sqlc.narg('body_part') IS NULL)
+ORDER BY exercises.name ASC;
 
 -- name: GetExerciseById :one
 SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part FROM exercises
