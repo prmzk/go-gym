@@ -12,6 +12,7 @@ import (
 type dataApi struct {
 	DB   *dataStore.Queries
 	auth func(http.Handler) http.Handler
+	Tx   *sql.DB
 }
 
 func NewApi(conn *sql.DB, authMiddleware func(http.Handler) http.Handler) (*dataApi, error) {
@@ -20,6 +21,7 @@ func NewApi(conn *sql.DB, authMiddleware func(http.Handler) http.Handler) (*data
 	dataApi := &dataApi{
 		DB:   db,
 		auth: authMiddleware,
+		Tx:   conn,
 	}
 	return dataApi, nil
 }
@@ -39,6 +41,8 @@ func (dataApi *dataApi) Router() *chi.Mux {
 	workoutsRouter := chi.NewRouter()
 	workoutsRouter.Use(dataApi.auth)
 	workoutsRouter.Get("/", dataApi.handlerGetWorkouts)
+	workoutsRouter.Post("/", dataApi.handlerCreateWorkout)
+	workoutsRouter.Get("/{id}", dataApi.handlerGetWorkoutByID)
 
 	r.Mount("/exercises", exerciseRouter)
 	r.Mount("/workouts", workoutsRouter)

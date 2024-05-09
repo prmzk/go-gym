@@ -36,12 +36,21 @@ type ExerciseCategory struct {
 	UpdatedAt time.Time
 }
 
+type ExerciseUser struct {
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	UserID     uuid.UUID
+	ExerciseID uuid.UUID
+	Notes      sql.NullString
+	RestTime   sql.NullInt32
+}
+
 type Set struct {
 	ID                uuid.UUID
 	WorkoutExerciseID uuid.NullUUID
-	Weight            sql.NullString
-	DeductedWeight    sql.NullString
-	Duration          sql.NullInt64
+	Weight            sql.NullFloat64
+	DeductedWeight    sql.NullFloat64
+	Duration          sql.NullInt32
 	Reps              sql.NullInt32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
@@ -50,9 +59,9 @@ type Set struct {
 type SetTemplate struct {
 	ID                 uuid.UUID
 	TemplateExerciseID uuid.NullUUID
-	Weight             sql.NullString
-	DeductedWeight     sql.NullString
-	Duration           sql.NullInt64
+	Weight             sql.NullFloat64
+	DeductedWeight     sql.NullFloat64
+	Duration           sql.NullInt32
 	Reps               sql.NullInt32
 	CreatedAt          time.Time
 	UpdatedAt          time.Time

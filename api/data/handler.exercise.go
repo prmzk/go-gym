@@ -42,6 +42,14 @@ func (dataApi *dataApi) handlerGetExercise(w http.ResponseWriter, r *http.Reques
 	category := r.URL.Query().Get("category")
 	bodyPart := r.URL.Query().Get("body_part")
 
+	if category == "all" {
+		category = ""
+	}
+
+	if bodyPart == "all" {
+		bodyPart = ""
+	}
+
 	exerciseRows, err := dataApi.DB.GetExercises(r.Context(), dataStore.GetExercisesParams{
 		Name:     sql.NullString{String: name, Valid: name != ""},
 		Category: sql.NullString{String: category, Valid: category != ""},
