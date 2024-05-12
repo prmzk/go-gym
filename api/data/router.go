@@ -38,11 +38,15 @@ func (dataApi *dataApi) Router() *chi.Mux {
 	exerciseRouter.Get("/bodyparts*", dataApi.handlerGetBodyParts)
 	exerciseRouter.Get("/bodyparts/{id}", dataApi.handlerGetExcerciseByBodyPart)
 
+	exerciseRouter.Post("/workout-user/{id}", dataApi.handlerUpsertExerciseUser)
+
 	workoutsRouter := chi.NewRouter()
 	workoutsRouter.Use(dataApi.auth)
 	workoutsRouter.Get("/", dataApi.handlerGetWorkouts)
 	workoutsRouter.Post("/", dataApi.handlerCreateWorkout)
 	workoutsRouter.Get("/{id}", dataApi.handlerGetWorkoutByID)
+
+	workoutsRouter.Get("/previous-sets/{id}", dataApi.handlerGetPreviousWorkoutExerciseSets)
 
 	r.Mount("/exercises", exerciseRouter)
 	r.Mount("/workouts", workoutsRouter)

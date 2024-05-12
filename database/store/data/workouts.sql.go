@@ -162,6 +162,68 @@ func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutEx
 	return items, nil
 }
 
+const getPreviousWorkoutExerciseSets = `-- name: GetPreviousWorkoutExerciseSets :many
+WITH workout_id AS (
+  SELECT workouts.id as max_date
+  FROM workouts
+  WHERE workouts.user_id = $2
+  ORDER BY workouts.created_at DESC
+  LIMIT 1
+)
+SELECT sets.id, sets.workout_exercise_id, sets.weight, sets.deducted_weight, sets.duration, sets.reps, sets.created_at
+FROM sets
+INNER JOIN workout_exercises ON sets.workout_exercise_id = workout_exercises.id
+INNER JOIN workouts ON workout_exercises.workout_id = workouts.id
+WHERE workouts.id = (SELECT max_date FROM workout_id)
+AND workout_exercises.exercise_id = $1
+`
+
+type GetPreviousWorkoutExerciseSetsParams struct {
+	ExerciseID uuid.NullUUID
+	UserID     uuid.NullUUID
+}
+
+type GetPreviousWorkoutExerciseSetsRow struct {
+	ID                uuid.UUID
+	WorkoutExerciseID uuid.NullUUID
+	Weight            sql.NullFloat64
+	DeductedWeight    sql.NullFloat64
+	Duration          sql.NullInt32
+	Reps              sql.NullInt32
+	CreatedAt         time.Time
+}
+
+func (q *Queries) GetPreviousWorkoutExerciseSets(ctx context.Context, arg GetPreviousWorkoutExerciseSetsParams) ([]GetPreviousWorkoutExerciseSetsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPreviousWorkoutExerciseSets, arg.ExerciseID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPreviousWorkoutExerciseSetsRow
+	for rows.Next() {
+		var i GetPreviousWorkoutExerciseSetsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkoutExerciseID,
+			&i.Weight,
+			&i.DeductedWeight,
+			&i.Duration,
+			&i.Reps,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWorkoutById = `-- name: GetWorkoutById :many
 SELECT workouts.id as id,
 user_id,

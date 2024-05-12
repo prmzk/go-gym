@@ -170,7 +170,6 @@ func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Req
 	}
 
 	render.Render(w, r, response.SuccessResponseOK(parsedWorkout))
-
 }
 
 type workoutRequest struct {
@@ -300,4 +299,52 @@ func (dataApi *dataApi) handlerCreateWorkout(w http.ResponseWriter, r *http.Requ
 	}
 
 	render.Render(w, r, response.SuccessResponseOK(nil))
+}
+
+type PrevSet struct {
+	SetID          uuid.UUID `json:"set_id"`
+	Weight         float64   `json:"weight,omitempty"`
+	DeductedWeight float64   `json:"deducted_weight,omitempty"`
+	Duration       int32     `json:"duration,omitempty"`
+	Reps           int32     `json:"reps,omitempty"`
+	CreatedAt      time.Time `json:"set_created_at"`
+}
+
+func (dataApi *dataApi) handlerGetPreviousWorkoutExerciseSets(w http.ResponseWriter, r *http.Request) {
+	exerciseID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseBadRequest(err))
+		return
+	}
+	user, ok := r.Context().Value(auth.UserKey).(authStore.User)
+
+	if !ok {
+		render.Render(w, r, response.ErrorResponseInternalServerError())
+		return
+	}
+
+	setsRow, err := dataApi.DB.GetPreviousWorkoutExerciseSets(r.Context(), data.GetPreviousWorkoutExerciseSetsParams{
+		ExerciseID: uuid.NullUUID{UUID: exerciseID, Valid: true},
+		UserID:     uuid.NullUUID{UUID: user.ID, Valid: true},
+	})
+
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseBadRequest(err))
+		return
+	}
+
+	sets := []PrevSet{}
+	for _, s := range setsRow {
+		set := PrevSet{
+			SetID:          s.ID,
+			Weight:         s.Weight.Float64,
+			DeductedWeight: s.DeductedWeight.Float64,
+			Duration:       s.Duration.Int32,
+			Reps:           s.Reps.Int32,
+			CreatedAt:      s.CreatedAt,
+		}
+		sets = append(sets, set)
+	}
+
+	render.Render(w, r, response.SuccessResponseOK(sets))
 }

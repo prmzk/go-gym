@@ -46,12 +46,18 @@ func (q *Queries) GetExerciseBodyParts(ctx context.Context) ([]ExerciseBodyPart,
 }
 
 const getExerciseByBodyPart = `-- name: GetExerciseByBodyPart :many
-SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part_name, body_part.id as body_part_id, body_part.created_at as body_part_created_at, body_part.updated_at as body_part_updated_at
+SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part_name, body_part.id as body_part_id, body_part.created_at as body_part_created_at, body_part.updated_at as body_part_updated_at, exercise_user.notes as notes, exercise_user.rest_time as rest_time
 FROM exercises
 RIGHT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part.id
 LEFT JOIN exercise_categories as category ON exercises.category_id = category.id
-WHERE body_part.id = $1
+LEFT JOIN exercise_user ON exercises.id = exercise_user.exercise_id AND exercise_user.user_id = $1
+WHERE body_part.id = $2
 `
+
+type GetExerciseByBodyPartParams struct {
+	UserID     uuid.UUID
+	BodyPartID uuid.UUID
+}
 
 type GetExerciseByBodyPartRow struct {
 	ID                uuid.NullUUID
@@ -65,10 +71,12 @@ type GetExerciseByBodyPartRow struct {
 	BodyPartID        uuid.UUID
 	BodyPartCreatedAt time.Time
 	BodyPartUpdatedAt time.Time
+	Notes             sql.NullString
+	RestTime          sql.NullInt32
 }
 
-func (q *Queries) GetExerciseByBodyPart(ctx context.Context, bodyPartID uuid.UUID) ([]GetExerciseByBodyPartRow, error) {
-	rows, err := q.db.QueryContext(ctx, getExerciseByBodyPart, bodyPartID)
+func (q *Queries) GetExerciseByBodyPart(ctx context.Context, arg GetExerciseByBodyPartParams) ([]GetExerciseByBodyPartRow, error) {
+	rows, err := q.db.QueryContext(ctx, getExerciseByBodyPart, arg.UserID, arg.BodyPartID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +96,8 @@ func (q *Queries) GetExerciseByBodyPart(ctx context.Context, bodyPartID uuid.UUI
 			&i.BodyPartID,
 			&i.BodyPartCreatedAt,
 			&i.BodyPartUpdatedAt,
+			&i.Notes,
+			&i.RestTime,
 		); err != nil {
 			return nil, err
 		}
@@ -103,12 +113,18 @@ func (q *Queries) GetExerciseByBodyPart(ctx context.Context, bodyPartID uuid.UUI
 }
 
 const getExerciseByCategory = `-- name: GetExerciseByCategory :many
-SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, body_part.name as body_part, category.name as category_name, category.id as category_id, category.created_at as category_created_at, category.updated_at as category_updated_at
+SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, body_part.name as body_part, category.name as category_name, category.id as category_id, category.created_at as category_created_at, category.updated_at as category_updated_at, exercise_user.notes as notes, exercise_user.rest_time as rest_time
 FROM exercises
 RIGHT JOIN exercise_categories as category ON exercises.category_id = category.id
 LEFT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part.id
-WHERE category.id = $1
+LEFT JOIN exercise_user ON exercises.id = exercise_user.exercise_id AND exercise_user.user_id = $1
+WHERE category.id = $2
 `
+
+type GetExerciseByCategoryParams struct {
+	UserID     uuid.UUID
+	CategoryID uuid.UUID
+}
 
 type GetExerciseByCategoryRow struct {
 	ID                uuid.NullUUID
@@ -122,10 +138,12 @@ type GetExerciseByCategoryRow struct {
 	CategoryID        uuid.UUID
 	CategoryCreatedAt time.Time
 	CategoryUpdatedAt time.Time
+	Notes             sql.NullString
+	RestTime          sql.NullInt32
 }
 
-func (q *Queries) GetExerciseByCategory(ctx context.Context, categoryID uuid.UUID) ([]GetExerciseByCategoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, getExerciseByCategory, categoryID)
+func (q *Queries) GetExerciseByCategory(ctx context.Context, arg GetExerciseByCategoryParams) ([]GetExerciseByCategoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getExerciseByCategory, arg.UserID, arg.CategoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +163,8 @@ func (q *Queries) GetExerciseByCategory(ctx context.Context, categoryID uuid.UUI
 			&i.CategoryID,
 			&i.CategoryCreatedAt,
 			&i.CategoryUpdatedAt,
+			&i.Notes,
+			&i.RestTime,
 		); err != nil {
 			return nil, err
 		}
@@ -160,11 +180,18 @@ func (q *Queries) GetExerciseByCategory(ctx context.Context, categoryID uuid.UUI
 }
 
 const getExerciseById = `-- name: GetExerciseById :one
-SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part FROM exercises
+SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part, exercise_user.notes as notes, exercise_user.rest_time as rest_time
+FROM exercises
 LEFT JOIN exercise_categories as category ON exercises.category_id = category.id
 LEFT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part.id
+LEFT JOIN exercise_user ON exercises.id = exercise_user.exercise_id AND exercise_user.user_id = $2
 WHERE exercises.id = $1
 `
+
+type GetExerciseByIdParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
 
 type GetExerciseByIdRow struct {
 	ID        uuid.UUID
@@ -175,10 +202,12 @@ type GetExerciseByIdRow struct {
 	VideoUrl  sql.NullString
 	Category  sql.NullString
 	BodyPart  sql.NullString
+	Notes     sql.NullString
+	RestTime  sql.NullInt32
 }
 
-func (q *Queries) GetExerciseById(ctx context.Context, id uuid.UUID) (GetExerciseByIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getExerciseById, id)
+func (q *Queries) GetExerciseById(ctx context.Context, arg GetExerciseByIdParams) (GetExerciseByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getExerciseById, arg.ID, arg.UserID)
 	var i GetExerciseByIdRow
 	err := row.Scan(
 		&i.ID,
@@ -189,6 +218,8 @@ func (q *Queries) GetExerciseById(ctx context.Context, id uuid.UUID) (GetExercis
 		&i.VideoUrl,
 		&i.Category,
 		&i.BodyPart,
+		&i.Notes,
+		&i.RestTime,
 	)
 	return i, err
 }
@@ -226,17 +257,19 @@ func (q *Queries) GetExerciseCategories(ctx context.Context) ([]ExerciseCategory
 }
 
 const getExercises = `-- name: GetExercises :many
-SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part 
+SELECT exercises.id, exercises.name, exercises.created_at, exercises.updated_at, exercises.image_url, exercises.video_url, category.name as category, body_part.name as body_part, exercise_user.notes as notes, exercise_user.rest_time as rest_time
 FROM exercises
 LEFT JOIN exercise_categories as category ON exercises.category_id = category.id
 LEFT JOIN exercise_body_parts as body_part ON exercises.body_part_id = body_part.id
-WHERE (exercises.name ILIKE '%' || $1 || '%' OR $1 IS NULL)
-AND (category.name = $2 OR $2 IS NULL)
-AND (body_part.name = $3 OR $3 IS NULL)
+LEFT JOIN exercise_user ON exercises.id = exercise_user.exercise_id AND exercise_user.user_id = $1
+WHERE (exercises.name ILIKE '%' || $2 || '%' OR $2 IS NULL)
+AND (category.name = $3 OR $3 IS NULL)
+AND (body_part.name = $4 OR $4 IS NULL)
 ORDER BY exercises.name ASC
 `
 
 type GetExercisesParams struct {
+	UserID   uuid.UUID
 	Name     sql.NullString
 	Category sql.NullString
 	BodyPart sql.NullString
@@ -251,10 +284,17 @@ type GetExercisesRow struct {
 	VideoUrl  sql.NullString
 	Category  sql.NullString
 	BodyPart  sql.NullString
+	Notes     sql.NullString
+	RestTime  sql.NullInt32
 }
 
 func (q *Queries) GetExercises(ctx context.Context, arg GetExercisesParams) ([]GetExercisesRow, error) {
-	rows, err := q.db.QueryContext(ctx, getExercises, arg.Name, arg.Category, arg.BodyPart)
+	rows, err := q.db.QueryContext(ctx, getExercises,
+		arg.UserID,
+		arg.Name,
+		arg.Category,
+		arg.BodyPart,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +311,8 @@ func (q *Queries) GetExercises(ctx context.Context, arg GetExercisesParams) ([]G
 			&i.VideoUrl,
 			&i.Category,
 			&i.BodyPart,
+			&i.Notes,
+			&i.RestTime,
 		); err != nil {
 			return nil, err
 		}
@@ -283,4 +325,28 @@ func (q *Queries) GetExercises(ctx context.Context, arg GetExercisesParams) ([]G
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertExerciseUser = `-- name: UpsertExerciseUser :exec
+INSERT INTO exercise_user (user_id, exercise_id, notes, rest_time)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, exercise_id) 
+DO UPDATE SET notes = COALESCE($3, exercise_user.notes), rest_time = COALESCE($4, exercise_user.rest_time)
+`
+
+type UpsertExerciseUserParams struct {
+	UserID     uuid.UUID
+	ExerciseID uuid.UUID
+	Notes      sql.NullString
+	RestTime   sql.NullInt32
+}
+
+func (q *Queries) UpsertExerciseUser(ctx context.Context, arg UpsertExerciseUserParams) error {
+	_, err := q.db.ExecContext(ctx, upsertExerciseUser,
+		arg.UserID,
+		arg.ExerciseID,
+		arg.Notes,
+		arg.RestTime,
+	)
+	return err
 }

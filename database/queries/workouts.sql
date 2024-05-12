@@ -61,3 +61,18 @@ INSERT INTO sets (id, workout_exercise_id, weight, deducted_weight, duration, re
 )
 RETURNING *;
 
+
+-- name: GetPreviousWorkoutExerciseSets :many
+WITH workout_id AS (
+  SELECT workouts.id as max_date
+  FROM workouts
+  WHERE workouts.user_id = sqlc.arg('user_id')
+  ORDER BY workouts.created_at DESC
+  LIMIT 1
+)
+SELECT sets.id, sets.workout_exercise_id, sets.weight, sets.deducted_weight, sets.duration, sets.reps, sets.created_at
+FROM sets
+INNER JOIN workout_exercises ON sets.workout_exercise_id = workout_exercises.id
+INNER JOIN workouts ON workout_exercises.workout_id = workouts.id
+WHERE workouts.id = (SELECT * FROM workout_id)
+AND workout_exercises.exercise_id = sqlc.arg('exercise_id');
