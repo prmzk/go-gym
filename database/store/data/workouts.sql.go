@@ -162,6 +162,31 @@ func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutEx
 	return items, nil
 }
 
+const deleteWorkout = `-- name: DeleteWorkout :exec
+WITH deleted_sets AS (
+  DELETE FROM sets
+  WHERE workout_exercise_id IN (
+    SELECT id FROM workout_exercises WHERE workout_id = $1
+  )
+),
+deleted_workout_exercises AS (
+  DELETE FROM workout_exercises
+  WHERE workout_id = $1
+)
+DELETE FROM workouts
+WHERE workouts.id = $1 AND workouts.user_id = $2
+`
+
+type DeleteWorkoutParams struct {
+	WorkoutID uuid.UUID
+	UserID    uuid.NullUUID
+}
+
+func (q *Queries) DeleteWorkout(ctx context.Context, arg DeleteWorkoutParams) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkout, arg.WorkoutID, arg.UserID)
+	return err
+}
+
 const getPreviousWorkoutExerciseSets = `-- name: GetPreviousWorkoutExerciseSets :many
 WITH workout_id AS (
   SELECT workouts.id as max_date

@@ -45,6 +45,7 @@ func (dataApi *dataApi) Router() *chi.Mux {
 	workoutsRouter.Get("/", dataApi.handlerGetWorkouts)
 	workoutsRouter.Post("/", dataApi.handlerCreateWorkout)
 	workoutsRouter.Get("/{id}", dataApi.handlerGetWorkoutByID)
+	workoutsRouter.Delete("/{id}", dataApi.handleDeleteWorkout)
 
 	workoutsRouter.Get("/previous-sets/{id}", dataApi.handlerGetPreviousWorkoutExerciseSets)
 

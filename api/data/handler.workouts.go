@@ -348,3 +348,28 @@ func (dataApi *dataApi) handlerGetPreviousWorkoutExerciseSets(w http.ResponseWri
 
 	render.Render(w, r, response.SuccessResponseOK(sets))
 }
+
+func (dataApi *dataApi) handleDeleteWorkout(w http.ResponseWriter, r *http.Request) {
+	workoutId, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseBadRequest(err))
+		return
+	}
+	user, ok := r.Context().Value(auth.UserKey).(authStore.User)
+	if !ok {
+		render.Render(w, r, response.ErrorResponseInternalServerError())
+		return
+	}
+
+	err = dataApi.DB.DeleteWorkout(r.Context(), data.DeleteWorkoutParams{
+		WorkoutID: workoutId,
+		UserID:    uuid.NullUUID{UUID: user.ID, Valid: true},
+	})
+
+	if err != nil {
+		render.Render(w, r, response.ErrorResponseBadRequest(err))
+		return
+	}
+
+	render.Render(w, r, response.SuccessResponseOK(nil))
+}

@@ -61,7 +61,6 @@ INSERT INTO sets (id, workout_exercise_id, weight, deducted_weight, duration, re
 )
 RETURNING *;
 
-
 -- name: GetPreviousWorkoutExerciseSets :many
 WITH workout_id AS (
   SELECT workouts.id as max_date
@@ -76,3 +75,17 @@ INNER JOIN workout_exercises ON sets.workout_exercise_id = workout_exercises.id
 INNER JOIN workouts ON workout_exercises.workout_id = workouts.id
 WHERE workouts.id = (SELECT * FROM workout_id)
 AND workout_exercises.exercise_id = sqlc.arg('exercise_id');
+
+-- name: DeleteWorkout :exec
+WITH deleted_sets AS (
+  DELETE FROM sets
+  WHERE workout_exercise_id IN (
+    SELECT id FROM workout_exercises WHERE workout_id = sqlc.arg('workout_id')
+  )
+),
+deleted_workout_exercises AS (
+  DELETE FROM workout_exercises
+  WHERE workout_id = sqlc.arg('workout_id')
+)
+DELETE FROM workouts
+WHERE workouts.id = sqlc.arg('workout_id') AND workouts.user_id = sqlc.arg('user_id');
