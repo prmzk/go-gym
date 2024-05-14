@@ -52,6 +52,7 @@ type Set struct {
 	DeductedWeight    sql.NullFloat64
 	Duration          sql.NullInt32
 	Reps              sql.NullInt32
+	OrderNo           int32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -63,6 +64,7 @@ type SetTemplate struct {
 	DeductedWeight     sql.NullFloat64
 	Duration           sql.NullInt32
 	Reps               sql.NullInt32
+	OrderNo            int32
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -79,6 +81,7 @@ type TemplateExercise struct {
 	ID         uuid.UUID
 	TemplateID uuid.NullUUID
 	ExerciseID uuid.NullUUID
+	OrderNo    int32
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }
@@ -114,6 +117,7 @@ type WorkoutExercise struct {
 	ID         uuid.UUID
 	WorkoutID  uuid.NullUUID
 	ExerciseID uuid.NullUUID
+	OrderNo    int32
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }

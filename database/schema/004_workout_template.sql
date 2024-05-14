@@ -12,6 +12,7 @@ CREATE TABLE template_exercises (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     template_id UUID REFERENCES templates(id),
     exercise_id UUID REFERENCES exercises(id),
+    order_no INT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

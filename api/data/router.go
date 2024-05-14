@@ -49,8 +49,18 @@ func (dataApi *dataApi) Router() *chi.Mux {
 
 	workoutsRouter.Get("/previous-sets/{id}", dataApi.handlerGetPreviousWorkoutExerciseSets)
 
+	templateRouter := chi.NewRouter()
+	templateRouter.Use(dataApi.auth)
+	templateRouter.Post("/", dataApi.handleCreateTemplate)
+	templateRouter.Get("/", dataApi.handleGetTemplate)
+	templateRouter.Get("/{id}", dataApi.handleGetTemplateById)
+	templateRouter.Delete("/{id}", dataApi.handleDeleteTemplate)
+	templateRouter.Post("/change-sets/{id}", dataApi.handleChangeSetTemplate)
+	templateRouter.Post("/change-values/{id}", dataApi.handleChangeSetTemplateValueOnly)
+
 	r.Mount("/exercises", exerciseRouter)
 	r.Mount("/workouts", workoutsRouter)
+	r.Mount("/templates", templateRouter)
 
 	return r
 }

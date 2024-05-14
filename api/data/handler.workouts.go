@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -79,6 +80,7 @@ type GetExercise struct {
 	CategoryName             string    `json:"category_name"`
 	BodyPartName             string    `json:"body_part_name"`
 	Sets                     []Set     `json:"sets"`
+	OrderNo                  int32     `json:"order_no,omitempty"`
 }
 
 type Set struct {
@@ -89,6 +91,7 @@ type Set struct {
 	Reps           int32     `json:"reps,omitempty"`
 	SetCreatedAt   time.Time `json:"set_created_at"`
 	SetUpdatedAt   time.Time `json:"set_updated_at"`
+	OrderNo        int32     `json:"order_no,omitempty"`
 }
 
 func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +143,7 @@ func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Req
 				Reps:           e.Reps.Int32,
 				SetCreatedAt:   e.SetCreatedAt,
 				SetUpdatedAt:   e.SetUpdatedAt,
+				OrderNo:        e.SetOrderNo,
 			})
 		} else {
 			// Exercise doesn't exist, create a new one
@@ -151,6 +155,7 @@ func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Req
 				ExerciseName:             e.ExerciseName,
 				CategoryName:             e.CategoryName,
 				BodyPartName:             e.BodyPartName,
+				OrderNo:                  e.WorkoutExerciseOrderNo,
 				Sets: []Set{
 					{
 						SetID:          e.SetID,
@@ -160,6 +165,7 @@ func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Req
 						Reps:           e.Reps.Int32,
 						SetCreatedAt:   e.SetCreatedAt,
 						SetUpdatedAt:   e.SetUpdatedAt,
+						OrderNo:        e.SetOrderNo,
 					},
 				},
 			}
@@ -167,6 +173,18 @@ func (dataApi *dataApi) handlerGetWorkoutByID(w http.ResponseWriter, r *http.Req
 			// Store the index of the new exercise in the map
 			exerciseIndex[e.ExerciseID] = len(parsedWorkout.WorkoutExercises) - 1
 		}
+	}
+
+	// Sort the workout exercises based on orderNo
+	sort.Slice(parsedWorkout.WorkoutExercises, func(i, j int) bool {
+		return parsedWorkout.WorkoutExercises[i].OrderNo < parsedWorkout.WorkoutExercises[j].OrderNo
+	})
+
+	// Sort the sets inside each workout exercise based on orderNo
+	for _, exercise := range parsedWorkout.WorkoutExercises {
+		sort.Slice(exercise.Sets, func(i, j int) bool {
+			return exercise.Sets[i].OrderNo < exercise.Sets[j].OrderNo
+		})
 	}
 
 	render.Render(w, r, response.SuccessResponseOK(parsedWorkout))
@@ -189,6 +207,7 @@ type workoutExerciseRequest struct {
 	ID         uuid.UUID `json:"id"`
 	ExerciseID uuid.UUID `json:"exercise_id"`
 	CreatedAt  time.Time `json:"created_at"`
+	OrderNo    int32     `json:"order_no,omitempty"`
 }
 
 type setRequest struct {
@@ -199,6 +218,7 @@ type setRequest struct {
 	DeductedWeight    float32   `json:"deducted_weight"`
 	Duration          int32     `json:"duration"`
 	Reps              int32     `json:"reps"`
+	OrderNo           int32     `json:"order_no,omitempty"`
 }
 
 func (body *workoutRequest) Bind(r *http.Request) error {
@@ -252,6 +272,7 @@ func (dataApi *dataApi) handlerCreateWorkout(w http.ResponseWriter, r *http.Requ
 		WorkoutIDArray:  []uuid.UUID{},
 		ExerciseIDArray: []uuid.UUID{},
 		CreatedAtArray:  []time.Time{},
+		OrderNoArray:    []int32{},
 	}
 
 	for _, e := range workoutDetailRequest.WorkoutExercises {
@@ -259,6 +280,7 @@ func (dataApi *dataApi) handlerCreateWorkout(w http.ResponseWriter, r *http.Requ
 		createWorkoutExerciseParams.WorkoutIDArray = append(createWorkoutExerciseParams.WorkoutIDArray, workoutRow.ID)
 		createWorkoutExerciseParams.ExerciseIDArray = append(createWorkoutExerciseParams.ExerciseIDArray, e.ExerciseID)
 		createWorkoutExerciseParams.CreatedAtArray = append(createWorkoutExerciseParams.CreatedAtArray, e.CreatedAt.UTC())
+		createWorkoutExerciseParams.OrderNoArray = append(createWorkoutExerciseParams.OrderNoArray, e.OrderNo)
 	}
 
 	_, err = qtx.CreateWorkoutExercise(r.Context(), createWorkoutExerciseParams)
@@ -275,6 +297,7 @@ func (dataApi *dataApi) handlerCreateWorkout(w http.ResponseWriter, r *http.Requ
 		DurationArray:          []int32{},
 		RepsArray:              []int32{},
 		CreatedAtArray:         []time.Time{},
+		OrderNoArray:           []int32{},
 	}
 
 	for _, e := range workoutDetailRequest.Sets {
@@ -285,6 +308,7 @@ func (dataApi *dataApi) handlerCreateWorkout(w http.ResponseWriter, r *http.Requ
 		createSetsParams.DurationArray = append(createSetsParams.DurationArray, e.Duration)
 		createSetsParams.RepsArray = append(createSetsParams.RepsArray, e.Reps)
 		createSetsParams.CreatedAtArray = append(createSetsParams.CreatedAtArray, e.CreatedAt.UTC())
+		createSetsParams.OrderNoArray = append(createSetsParams.OrderNoArray, e.OrderNo)
 	}
 
 	_, err = qtx.CreateSets(r.Context(), createSetsParams)
@@ -308,6 +332,7 @@ type PrevSet struct {
 	Duration       int32     `json:"duration,omitempty"`
 	Reps           int32     `json:"reps,omitempty"`
 	CreatedAt      time.Time `json:"set_created_at"`
+	OrderNo        int32     `json:"order_no,omitempty"`
 }
 
 func (dataApi *dataApi) handlerGetPreviousWorkoutExerciseSets(w http.ResponseWriter, r *http.Request) {
@@ -342,9 +367,15 @@ func (dataApi *dataApi) handlerGetPreviousWorkoutExerciseSets(w http.ResponseWri
 			Duration:       s.Duration.Int32,
 			Reps:           s.Reps.Int32,
 			CreatedAt:      s.CreatedAt,
+			OrderNo:        s.OrderNo,
 		}
 		sets = append(sets, set)
 	}
+
+	// Order setsRow based on OrderNo
+	sort.Slice(sets, func(i, j int) bool {
+		return sets[i].OrderNo < sets[j].OrderNo
+	})
 
 	render.Render(w, r, response.SuccessResponseOK(sets))
 }

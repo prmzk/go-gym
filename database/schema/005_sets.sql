@@ -6,6 +6,7 @@ CREATE TABLE sets (
     deducted_weight FLOAT4,
     duration INT,
     reps INT,
+    order_no INT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -17,6 +18,7 @@ CREATE TABLE set_templates (
     deducted_weight FLOAT4,
     duration INT,
     reps INT,
+    order_no INT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

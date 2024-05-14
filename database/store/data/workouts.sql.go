@@ -14,17 +14,82 @@ import (
 	"github.com/lib/pq"
 )
 
+const createSetTemplates = `-- name: CreateSetTemplates :many
+INSERT INTO set_templates (id, template_exercise_id, weight, deducted_weight, duration, reps, order_no) VALUES (  
+  unnest($1::UUID[]),  
+  unnest($2::UUID[]),  
+  NULLIF(unnest($3::FLOAT4[]), 0),  
+  NULLIF(unnest($4::FLOAT4[]), 0),  
+  NULLIF(unnest($5::INT[]), 0),  
+  NULLIF(unnest($6::INT[]), 0),
+  unnest($7::INT[])
+)
+RETURNING id, template_exercise_id, weight, deducted_weight, duration, reps, order_no, created_at, updated_at
+`
+
+type CreateSetTemplatesParams struct {
+	IDArray             []uuid.UUID
+	TemplateExerciseID  []uuid.UUID
+	WeightArray         []float32
+	DeductedWeightArray []float32
+	DurationArray       []int32
+	RepsArray           []int32
+	OrderNoArray        []int32
+}
+
+func (q *Queries) CreateSetTemplates(ctx context.Context, arg CreateSetTemplatesParams) ([]SetTemplate, error) {
+	rows, err := q.db.QueryContext(ctx, createSetTemplates,
+		pq.Array(arg.IDArray),
+		pq.Array(arg.TemplateExerciseID),
+		pq.Array(arg.WeightArray),
+		pq.Array(arg.DeductedWeightArray),
+		pq.Array(arg.DurationArray),
+		pq.Array(arg.RepsArray),
+		pq.Array(arg.OrderNoArray),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SetTemplate
+	for rows.Next() {
+		var i SetTemplate
+		if err := rows.Scan(
+			&i.ID,
+			&i.TemplateExerciseID,
+			&i.Weight,
+			&i.DeductedWeight,
+			&i.Duration,
+			&i.Reps,
+			&i.OrderNo,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createSets = `-- name: CreateSets :many
-INSERT INTO sets (id, workout_exercise_id, weight, deducted_weight, duration, reps, created_at) VALUES (  
+INSERT INTO sets (id, workout_exercise_id, weight, deducted_weight, duration, reps, created_at, order_no) VALUES (  
   unnest($1::UUID[]),  
   unnest($2::UUID[]),  
   NULLIF(unnest($3::FLOAT4[]), 0),  
   NULLIF(unnest($4::FLOAT4[]), 0),  
   NULLIF(unnest($5::INT[]), 0),  
   NULLIF(unnest($6::INT[]), 0),  
-  unnest($7::TIMESTAMPTZ[])  
+  unnest($7::TIMESTAMPTZ[]),
+  unnest($8::INT[])
 )
-RETURNING id, workout_exercise_id, weight, deducted_weight, duration, reps, created_at, updated_at
+RETURNING id, workout_exercise_id, weight, deducted_weight, duration, reps, order_no, created_at, updated_at
 `
 
 type CreateSetsParams struct {
@@ -35,6 +100,7 @@ type CreateSetsParams struct {
 	DurationArray          []int32
 	RepsArray              []int32
 	CreatedAtArray         []time.Time
+	OrderNoArray           []int32
 }
 
 func (q *Queries) CreateSets(ctx context.Context, arg CreateSetsParams) ([]Set, error) {
@@ -46,6 +112,7 @@ func (q *Queries) CreateSets(ctx context.Context, arg CreateSetsParams) ([]Set, 
 		pq.Array(arg.DurationArray),
 		pq.Array(arg.RepsArray),
 		pq.Array(arg.CreatedAtArray),
+		pq.Array(arg.OrderNoArray),
 	)
 	if err != nil {
 		return nil, err
@@ -61,6 +128,82 @@ func (q *Queries) CreateSets(ctx context.Context, arg CreateSetsParams) ([]Set, 
 			&i.DeductedWeight,
 			&i.Duration,
 			&i.Reps,
+			&i.OrderNo,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const createTemplate = `-- name: CreateTemplate :one
+INSERT INTO templates (name, user_id) VALUES ($1, $2)
+RETURNING id, user_id, name, created_at, updated_at
+`
+
+type CreateTemplateParams struct {
+	Name   string
+	UserID uuid.NullUUID
+}
+
+func (q *Queries) CreateTemplate(ctx context.Context, arg CreateTemplateParams) (Template, error) {
+	row := q.db.QueryRowContext(ctx, createTemplate, arg.Name, arg.UserID)
+	var i Template
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createTemplateExercises = `-- name: CreateTemplateExercises :many
+INSERT INTO template_exercises (id, template_id, exercise_id, order_no) VALUES (  
+  unnest($1::UUID[]),  
+  unnest($2::UUID[]),
+  unnest($3::UUID[]),
+  unnest($4::INT[])
+)
+RETURNING id, template_id, exercise_id, order_no, created_at, updated_at
+`
+
+type CreateTemplateExercisesParams struct {
+	IDArray         []uuid.UUID
+	TemplateID      []uuid.UUID
+	ExerciseIDArray []uuid.UUID
+	OrderNoArray    []int32
+}
+
+func (q *Queries) CreateTemplateExercises(ctx context.Context, arg CreateTemplateExercisesParams) ([]TemplateExercise, error) {
+	rows, err := q.db.QueryContext(ctx, createTemplateExercises,
+		pq.Array(arg.IDArray),
+		pq.Array(arg.TemplateID),
+		pq.Array(arg.ExerciseIDArray),
+		pq.Array(arg.OrderNoArray),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TemplateExercise
+	for rows.Next() {
+		var i TemplateExercise
+		if err := rows.Scan(
+			&i.ID,
+			&i.TemplateID,
+			&i.ExerciseID,
+			&i.OrderNo,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -112,13 +255,14 @@ func (q *Queries) CreateWorkout(ctx context.Context, arg CreateWorkoutParams) (W
 }
 
 const createWorkoutExercise = `-- name: CreateWorkoutExercise :many
-INSERT INTO workout_exercises (id, workout_id, exercise_id, created_at) VALUES (  
+INSERT INTO workout_exercises (id, workout_id, exercise_id, created_at, order_no) VALUES (  
   unnest($1::UUID[]),  
   unnest($2::UUID[]),
   unnest($3::UUID[]), 
-  unnest($4::TIMESTAMPTZ[])  
+  unnest($4::TIMESTAMPTZ[]),
+  unnest($5::INT[])
 )
-RETURNING id, workout_id, exercise_id, created_at, updated_at
+RETURNING id, workout_id, exercise_id, order_no, created_at, updated_at
 `
 
 type CreateWorkoutExerciseParams struct {
@@ -126,6 +270,7 @@ type CreateWorkoutExerciseParams struct {
 	WorkoutIDArray  []uuid.UUID
 	ExerciseIDArray []uuid.UUID
 	CreatedAtArray  []time.Time
+	OrderNoArray    []int32
 }
 
 func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutExerciseParams) ([]WorkoutExercise, error) {
@@ -134,6 +279,7 @@ func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutEx
 		pq.Array(arg.WorkoutIDArray),
 		pq.Array(arg.ExerciseIDArray),
 		pq.Array(arg.CreatedAtArray),
+		pq.Array(arg.OrderNoArray),
 	)
 	if err != nil {
 		return nil, err
@@ -146,6 +292,7 @@ func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutEx
 			&i.ID,
 			&i.WorkoutID,
 			&i.ExerciseID,
+			&i.OrderNo,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -160,6 +307,73 @@ func (q *Queries) CreateWorkoutExercise(ctx context.Context, arg CreateWorkoutEx
 		return nil, err
 	}
 	return items, nil
+}
+
+const deleteSetTemplate = `-- name: DeleteSetTemplate :exec
+DELETE FROM set_templates
+WHERE set_templates.template_exercise_id IN (
+  SELECT id FROM template_exercises WHERE template_exercises.template_id IN (
+    SELECT id FROM templates WHERE templates.id = $1 AND templates.user_id = $2
+  )
+)
+`
+
+type DeleteSetTemplateParams struct {
+	TemplateID uuid.UUID
+	UserID     uuid.NullUUID
+}
+
+func (q *Queries) DeleteSetTemplate(ctx context.Context, arg DeleteSetTemplateParams) error {
+	_, err := q.db.ExecContext(ctx, deleteSetTemplate, arg.TemplateID, arg.UserID)
+	return err
+}
+
+const deleteTemplate = `-- name: DeleteTemplate :exec
+WITH deleted_sets AS (
+  DELETE FROM set_templates
+  WHERE template_exercise_id IN (
+    SELECT id FROM template_exercises WHERE template_id = $1
+  )
+),
+deleted_template_exercises AS (
+  DELETE FROM template_exercises
+  WHERE template_id = $1
+)
+DELETE FROM templates
+WHERE templates.id = $1 AND templates.user_id = $2
+`
+
+type DeleteTemplateParams struct {
+	TemplateID uuid.UUID
+	UserID     uuid.NullUUID
+}
+
+func (q *Queries) DeleteTemplate(ctx context.Context, arg DeleteTemplateParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTemplate, arg.TemplateID, arg.UserID)
+	return err
+}
+
+const deleteTemplateExercise = `-- name: DeleteTemplateExercise :exec
+WITH deleted_sets AS (
+  DELETE FROM set_templates
+  WHERE template_exercise_id IN (
+    SELECT id FROM template_exercises WHERE template_id = $1
+  )
+)
+DELETE FROM template_exercises
+WHERE template_exercises.template_id IN (
+  SELECT id FROM templates WHERE templates.id = $1 AND templates.user_id = $2
+)
+`
+
+type DeleteTemplateExerciseParams struct {
+	TemplateID uuid.UUID
+	UserID     uuid.NullUUID
+}
+
+func (q *Queries) DeleteTemplateExercise(ctx context.Context, arg DeleteTemplateExerciseParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTemplateExercise, arg.TemplateID, arg.UserID)
+	return err
 }
 
 const deleteWorkout = `-- name: DeleteWorkout :exec
@@ -188,24 +402,28 @@ func (q *Queries) DeleteWorkout(ctx context.Context, arg DeleteWorkoutParams) er
 }
 
 const getPreviousWorkoutExerciseSets = `-- name: GetPreviousWorkoutExerciseSets :many
-WITH workout_id AS (
-  SELECT workouts.id as max_date
-  FROM workouts
-  WHERE workouts.user_id = $2
-  ORDER BY workouts.created_at DESC
-  LIMIT 1
-)
-SELECT sets.id, sets.workout_exercise_id, sets.weight, sets.deducted_weight, sets.duration, sets.reps, sets.created_at
+SELECT sets.id, sets.workout_exercise_id, sets.weight, sets.deducted_weight, sets.duration, sets.reps, sets.created_at, sets.order_no
 FROM sets
 INNER JOIN workout_exercises ON sets.workout_exercise_id = workout_exercises.id
 INNER JOIN workouts ON workout_exercises.workout_id = workouts.id
-WHERE workouts.id = (SELECT max_date FROM workout_id)
-AND workout_exercises.exercise_id = $1
+WHERE workouts.user_id = $1
+AND workout_exercises.exercise_id = $2
+AND sets.workout_exercise_id IN (
+  SELECT workout_exercise_id
+  FROM sets
+  INNER JOIN workout_exercises ON sets.workout_exercise_id = workout_exercises.id
+  INNER JOIN workouts ON workout_exercises.workout_id = workouts.id
+  WHERE workouts.user_id = $1
+  AND workout_exercises.exercise_id = $2
+  ORDER BY sets.created_at DESC
+  LIMIT 1
+)
+ORDER BY sets.created_at DESC
 `
 
 type GetPreviousWorkoutExerciseSetsParams struct {
-	ExerciseID uuid.NullUUID
 	UserID     uuid.NullUUID
+	ExerciseID uuid.NullUUID
 }
 
 type GetPreviousWorkoutExerciseSetsRow struct {
@@ -216,10 +434,11 @@ type GetPreviousWorkoutExerciseSetsRow struct {
 	Duration          sql.NullInt32
 	Reps              sql.NullInt32
 	CreatedAt         time.Time
+	OrderNo           int32
 }
 
 func (q *Queries) GetPreviousWorkoutExerciseSets(ctx context.Context, arg GetPreviousWorkoutExerciseSetsParams) ([]GetPreviousWorkoutExerciseSetsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getPreviousWorkoutExerciseSets, arg.ExerciseID, arg.UserID)
+	rows, err := q.db.QueryContext(ctx, getPreviousWorkoutExerciseSets, arg.UserID, arg.ExerciseID)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +454,192 @@ func (q *Queries) GetPreviousWorkoutExerciseSets(ctx context.Context, arg GetPre
 			&i.Duration,
 			&i.Reps,
 			&i.CreatedAt,
+			&i.OrderNo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTemplateById = `-- name: GetTemplateById :many
+SELECT templates.id as id,
+user_id,
+templates.name as name,
+templates.created_at as created_at,
+templates.updated_at as updated_at,
+template_exercises.id as template_exercise_id,
+template_exercises.created_at as workout_exercise_created_at,
+template_exercises.updated_at as workout_exercise_updated_at,
+template_exercises.order_no as template_exercise_order_no,
+exercises.id as exercise_id,
+exercises.name as exercise_name,
+exercise_categories.name as category_name,
+exercise_body_parts.name as body_part_name,
+set_templates.id as set_id,
+set_templates.order_no as set_templates_order_no,
+weight,
+deducted_weight,
+duration,
+reps,
+set_templates.created_at as set_created_at,
+set_templates.updated_at as set_updated_at
+FROM templates
+INNER JOIN users ON templates.user_id = users.id
+INNER JOIN template_exercises ON templates.id = template_exercises.template_id
+INNER JOIN exercises ON template_exercises.exercise_id = exercises.id
+INNER JOIN exercise_categories ON exercises.category_id = exercise_categories.id
+INNER JOIN exercise_body_parts ON exercises.body_part_id = exercise_body_parts.id
+LEFT JOIN set_templates ON template_exercises.id = set_templates.template_exercise_id
+WHERE templates.id = $1 AND templates.user_id = $2
+`
+
+type GetTemplateByIdParams struct {
+	ID     uuid.UUID
+	UserID uuid.NullUUID
+}
+
+type GetTemplateByIdRow struct {
+	ID                       uuid.UUID
+	UserID                   uuid.NullUUID
+	Name                     string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	TemplateExerciseID       uuid.UUID
+	WorkoutExerciseCreatedAt time.Time
+	WorkoutExerciseUpdatedAt time.Time
+	TemplateExerciseOrderNo  int32
+	ExerciseID               uuid.UUID
+	ExerciseName             string
+	CategoryName             string
+	BodyPartName             string
+	SetID                    uuid.NullUUID
+	SetTemplatesOrderNo      sql.NullInt32
+	Weight                   sql.NullFloat64
+	DeductedWeight           sql.NullFloat64
+	Duration                 sql.NullInt32
+	Reps                     sql.NullInt32
+	SetCreatedAt             sql.NullTime
+	SetUpdatedAt             sql.NullTime
+}
+
+func (q *Queries) GetTemplateById(ctx context.Context, arg GetTemplateByIdParams) ([]GetTemplateByIdRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTemplateById, arg.ID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTemplateByIdRow
+	for rows.Next() {
+		var i GetTemplateByIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TemplateExerciseID,
+			&i.WorkoutExerciseCreatedAt,
+			&i.WorkoutExerciseUpdatedAt,
+			&i.TemplateExerciseOrderNo,
+			&i.ExerciseID,
+			&i.ExerciseName,
+			&i.CategoryName,
+			&i.BodyPartName,
+			&i.SetID,
+			&i.SetTemplatesOrderNo,
+			&i.Weight,
+			&i.DeductedWeight,
+			&i.Duration,
+			&i.Reps,
+			&i.SetCreatedAt,
+			&i.SetUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTemplateExerciseByExerciseId = `-- name: GetTemplateExerciseByExerciseId :many
+SELECT id, template_id, exercise_id, order_no, created_at, updated_at FROM template_exercises
+WHERE template_exercises.exercise_id = ANY($1::UUID[])
+`
+
+func (q *Queries) GetTemplateExerciseByExerciseId(ctx context.Context, exerciseID []uuid.UUID) ([]TemplateExercise, error) {
+	rows, err := q.db.QueryContext(ctx, getTemplateExerciseByExerciseId, pq.Array(exerciseID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TemplateExercise
+	for rows.Next() {
+		var i TemplateExercise
+		if err := rows.Scan(
+			&i.ID,
+			&i.TemplateID,
+			&i.ExerciseID,
+			&i.OrderNo,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTemplates = `-- name: GetTemplates :many
+SELECT templates.id, templates.name, templates.created_at, templates.updated_at, users.id as user_id
+FROM templates
+INNER JOIN users ON templates.user_id = users.id
+WHERE templates.user_id = $1
+`
+
+type GetTemplatesRow struct {
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UserID    uuid.UUID
+}
+
+func (q *Queries) GetTemplates(ctx context.Context, userID uuid.NullUUID) ([]GetTemplatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getTemplates, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTemplatesRow
+	for rows.Next() {
+		var i GetTemplatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -260,6 +665,7 @@ end_time,
 workout_exercises.id as workout_exercise_id,
 workout_exercises.created_at as workout_exercise_created_at,
 workout_exercises.updated_at as workout_exercise_updated_at,
+workout_exercises.order_no as workout_exercise_order_no,
 exercises.id as exercise_id,
 exercises.name as exercise_name,
 exercise_categories.name as category_name,
@@ -270,7 +676,8 @@ deducted_weight,
 duration,
 reps,
 sets.created_at as set_created_at,
-sets.updated_at as set_updated_at
+sets.updated_at as set_updated_at,
+sets.order_no as set_order_no
 FROM workouts
 INNER JOIN users ON workouts.user_id = users.id
 INNER JOIN workout_exercises ON workouts.id = workout_exercises.workout_id
@@ -297,6 +704,7 @@ type GetWorkoutByIdRow struct {
 	WorkoutExerciseID        uuid.UUID
 	WorkoutExerciseCreatedAt time.Time
 	WorkoutExerciseUpdatedAt time.Time
+	WorkoutExerciseOrderNo   int32
 	ExerciseID               uuid.UUID
 	ExerciseName             string
 	CategoryName             string
@@ -308,6 +716,7 @@ type GetWorkoutByIdRow struct {
 	Reps                     sql.NullInt32
 	SetCreatedAt             time.Time
 	SetUpdatedAt             time.Time
+	SetOrderNo               int32
 }
 
 func (q *Queries) GetWorkoutById(ctx context.Context, arg GetWorkoutByIdParams) ([]GetWorkoutByIdRow, error) {
@@ -330,6 +739,7 @@ func (q *Queries) GetWorkoutById(ctx context.Context, arg GetWorkoutByIdParams) 
 			&i.WorkoutExerciseID,
 			&i.WorkoutExerciseCreatedAt,
 			&i.WorkoutExerciseUpdatedAt,
+			&i.WorkoutExerciseOrderNo,
 			&i.ExerciseID,
 			&i.ExerciseName,
 			&i.CategoryName,
@@ -341,6 +751,7 @@ func (q *Queries) GetWorkoutById(ctx context.Context, arg GetWorkoutByIdParams) 
 			&i.Reps,
 			&i.SetCreatedAt,
 			&i.SetUpdatedAt,
+			&i.SetOrderNo,
 		); err != nil {
 			return nil, err
 		}
